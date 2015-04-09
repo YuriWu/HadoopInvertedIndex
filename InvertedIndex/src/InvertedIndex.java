@@ -1,8 +1,12 @@
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -13,16 +17,12 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
 public class InvertedIndex {
-
 	
-	public static class InvertedIndexMapper extends Mapper<Object, Text, Text, Text> {
-		
-		private Text outKey = new Text();
-		private Text outVal = new Text();
-		
+	public static class InvertedIndexMapper extends Mapper<Object, Text, Text, IntWritable> {
+
 		@Override
 		protected void map(Object key, Text value,
-				Mapper<Object, Text, Text, Text>.Context context)
+				Mapper<Object, Text, Text, IntWritable>.Context context)
 				throws IOException, InterruptedException {
 			
 			StringTokenizer tokens = new StringTokenizer(value.toString());
@@ -31,41 +31,42 @@ public class InvertedIndex {
 			while(tokens.hasMoreTokens())
 			{
 				String token = tokens.nextToken();
+				Text outKey = new Text();
 				outKey.set(token + ":" + split.getPath());
-				outVal.set("1");
-				context.write(outKey, outVal);
-			}
+				context.write(outKey, new IntWritable(1));
+			}		
 		}
+		
 	}
 	
-	public static class InvertedIndexCombiner extends Reducer<Text, Text, Text, Text>
+	public static class InvertedIndexCombiner extends Reducer<Text, IntWritable, Text, IntWritable>
 	{
 
 		private Text outKey = new Text();
-		private Text outVal = new Text();
+		private IntWritable outVal = new IntWritable();
 		
 		@Override
-		protected void reduce(Text key, Iterable<Text> values,
-				Reducer<Text, Text, Text, Text>.Context context)
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Reducer<Text, IntWritable, Text, IntWritable>.Context context)
 				throws IOException, InterruptedException {
 			
 			String[] keys = key.toString().split(":");
 			int sum = 0;
-			for(Text val : values) {
-				sum += Integer.parseInt(val.toString());
+			for(IntWritable val : values) {
+				sum += val.get();
 			}
-			outKey.set(keys[0]);
 			int index = keys[keys.length - 1].lastIndexOf('/');
-			outVal.set(keys[keys.length - 1].substring(index +1) + ":" + sum);
+			outKey.set(keys[0] + ":" + keys[keys.length - 1].substring(index +1));
+			outVal.set(sum);
 			context.write(outKey, outVal);
 		}
 	}
 	
-	public static class InvertedIndexPartitioner extends HashPartitioner<Text, Text>
+	public static class InvertedIndexPartitioner extends HashPartitioner<Text, IntWritable>
 	{
 
 		@Override
-		public int getPartition(Text key, Text value, int numReduceTasks) {
+		public int getPartition(Text key, IntWritable value, int numReduceTasks) {
 			String term = new String();
 			term = key.toString().split(":")[0];
 			return super.getPartition(new Text(term), value, numReduceTasks);
@@ -73,19 +74,64 @@ public class InvertedIndex {
 		
 	}
 	
-	public static class InvertedIndexReducer extends Reducer<Text, Text, Text, Text>
+	public static class InvertedIndexReducer extends Reducer<Text, IntWritable, Text, Text>
 	{
-
+		static int fileNum = 0;
+		static int totalCount = 0;
+		static Text curItem = new Text("");
+		static List<String> postingList = new ArrayList<String>();
 		@Override
-		protected void reduce(Text key, Iterable<Text> values,
-				Reducer<Text, Text, Text, Text>.Context context)
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Reducer<Text, IntWritable, Text, Text>.Context context)
 				throws IOException, InterruptedException {
 			
-			StringBuffer strBuf = new StringBuffer();
-			for(Text text : values) {
-				strBuf.append(text.toString() + " ,");
+			int sum;
+			sum = 0;
+			
+			String curFile = key.toString().split(":")[1];
+			key = new Text(key.toString().split(":")[0]);
+			
+			Iterator<IntWritable> valueIter = values.iterator();
+			while(valueIter.hasNext())
+			{
+				int curValue = valueIter.next().get();
+				sum += curValue;
 			}
-			context.write(key, new Text(strBuf.toString()));
+			
+			if(!curItem.equals(key) && !curItem.toString().equals(""))
+			{
+				StringBuffer strBuf = new StringBuffer("\t");
+				for(String item : postingList)
+				{
+					strBuf.append(item + ",");
+				}
+				context.write(curItem, new Text(strBuf.toString()));
+				float rate = ( (float)totalCount / (float)fileNum );
+				context.write(curItem, new Text("\t" + rate));
+				postingList = new ArrayList<String>();
+				fileNum = 0;
+				totalCount = 0;
+			}
+			curItem = new Text(key);
+			postingList.add(curFile + ":" + sum);
+			fileNum += 1;
+			totalCount += sum;
+		}
+		
+		@Override
+		protected void cleanup(
+				Reducer<Text, IntWritable, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			
+			StringBuffer strBuf = new StringBuffer("\t");
+			for(String item : postingList)
+			{
+				strBuf.append(item);
+			}
+			context.write(curItem, new Text(strBuf.toString()));
+			float rate = ( (float)totalCount / (float)fileNum );
+			context.write(curItem, new Text("\t" + rate));
+			postingList = new ArrayList<String>();
 		}
 	}
 	
@@ -100,7 +146,7 @@ public class InvertedIndex {
 		job.setPartitionerClass(InvertedIndex.InvertedIndexPartitioner.class);
 		job.setReducerClass(InvertedIndex.InvertedIndexReducer.class);
 		job.setMapOutputKeyClass(Text.class);
-		job.setMapOutputValueClass(Text.class);
+		job.setMapOutputValueClass(IntWritable.class);
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(Text.class);
 		
