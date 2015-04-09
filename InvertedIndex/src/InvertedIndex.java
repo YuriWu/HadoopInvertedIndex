@@ -10,6 +10,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
 public class InvertedIndex {
 
@@ -60,6 +61,18 @@ public class InvertedIndex {
 		}
 	}
 	
+	public static class InvertedIndexPartitioner extends HashPartitioner<Text, Text>
+	{
+
+		@Override
+		public int getPartition(Text key, Text value, int numReduceTasks) {
+			String term = new String();
+			term = key.toString().split(":")[0];
+			return super.getPartition(new Text(term), value, numReduceTasks);
+		}
+		
+	}
+	
 	public static class InvertedIndexReducer extends Reducer<Text, Text, Text, Text>
 	{
 
@@ -84,6 +97,7 @@ public class InvertedIndex {
 		job.setJarByClass(InvertedIndex.class);
 		job.setMapperClass(InvertedIndex.InvertedIndexMapper.class);
 		job.setCombinerClass(InvertedIndex.InvertedIndexCombiner.class);
+		job.setPartitionerClass(InvertedIndex.InvertedIndexPartitioner.class);
 		job.setReducerClass(InvertedIndex.InvertedIndexReducer.class);
 		job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(Text.class);
