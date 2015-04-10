@@ -100,14 +100,18 @@ public class InvertedIndex {
 			
 			if(!curItem.equals(key) && !curItem.toString().equals(""))
 			{
-				StringBuffer strBuf = new StringBuffer("\t");
-				for(String item : postingList)
+				float rate = ( (float)totalCount / (float)fileNum );
+				StringBuffer strBuf = new StringBuffer("\t" + rate + ",");
+				Iterator<String> listIter = postingList.iterator(); 
+				while(listIter.hasNext())
 				{
-					strBuf.append(item + ",");
+					strBuf.append(listIter.next());
+					if(listIter.hasNext())
+					{
+						strBuf.append(";");
+					}
 				}
 				context.write(curItem, new Text(strBuf.toString()));
-				float rate = ( (float)totalCount / (float)fileNum );
-				context.write(curItem, new Text("\t" + rate));
 				postingList = new ArrayList<String>();
 				fileNum = 0;
 				totalCount = 0;
@@ -123,14 +127,18 @@ public class InvertedIndex {
 				Reducer<Text, IntWritable, Text, Text>.Context context)
 				throws IOException, InterruptedException {
 			
-			StringBuffer strBuf = new StringBuffer("\t");
-			for(String item : postingList)
+			float rate = ( (float)totalCount / (float)fileNum );
+			StringBuffer strBuf = new StringBuffer("\t" + rate + ",");
+			Iterator<String> listIter = postingList.iterator(); 
+			while(listIter.hasNext())
 			{
-				strBuf.append(item);
+				strBuf.append(listIter.next());
+				if(listIter.hasNext())
+				{
+					strBuf.append(";");
+				}
 			}
 			context.write(curItem, new Text(strBuf.toString()));
-			float rate = ( (float)totalCount / (float)fileNum );
-			context.write(curItem, new Text("\t" + rate));
 			postingList = new ArrayList<String>();
 		}
 	}
