@@ -56,7 +56,7 @@ public class InvertedIndex {
 				sum += val.get();
 			}
 			int index = keys[keys.length - 1].lastIndexOf('/');
-			outKey.set(keys[0] + ":" + keys[keys.length - 1].substring(index +1));
+			outKey.set(keys[0].trim() + ":" + keys[keys.length - 1].substring(index +1));
 			outVal.set(sum);
 			context.write(outKey, outVal);
 		}
