@@ -48,16 +48,24 @@ public class InvertedIndex {
 				Mapper<Object, Text, Text, IntWritable>.Context context)
 				throws IOException, InterruptedException {
 			
+			String curPath;
+			
 			StringTokenizer tokens = new StringTokenizer(value.toString());
 			FileSplit split = (FileSplit) context.getInputSplit();
+			curPath = "";
+			String splits[] = split.getPath().toString().split("\\.");
+			for(int i = 0 ; i < splits.length-2 ; ++i)
+			{
+				curPath += splits[i];
+			}
 			
 			while(tokens.hasMoreTokens())
 			{
 				String token = tokens.nextToken();
 				if(!stopWordSet.contains(token))
 				{
-					Text outKey = new Text();
-					outKey.set(token + ":" + split.getPath());
+					Text outKey = new Text();		
+					outKey.set(token + ":" + curPath);
 					context.write(outKey, new IntWritable(1));
 				}
 			}		
@@ -127,7 +135,7 @@ public class InvertedIndex {
 			if(!curItem.equals(key) && !curItem.toString().equals(""))
 			{
 				float rate = ( (float)totalCount / (float)fileNum );
-				StringBuffer strBuf = new StringBuffer("\t" + rate + ",");
+				StringBuffer strBuf = new StringBuffer(rate + ",");
 				Iterator<String> listIter = postingList.iterator(); 
 				while(listIter.hasNext())
 				{
@@ -154,7 +162,7 @@ public class InvertedIndex {
 				throws IOException, InterruptedException {
 			
 			float rate = ( (float)totalCount / (float)fileNum );
-			StringBuffer strBuf = new StringBuffer("\t" + rate + ",");
+			StringBuffer strBuf = new StringBuffer(rate + ",");
 			Iterator<String> listIter = postingList.iterator(); 
 			while(listIter.hasNext())
 			{
