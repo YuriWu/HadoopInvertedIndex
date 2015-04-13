@@ -1,7 +1,11 @@
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
@@ -20,6 +24,25 @@ public class InvertedIndex {
 	
 	public static class InvertedIndexMapper extends Mapper<Object, Text, Text, IntWritable> {
 
+		private static String stopWordFilePath = "input/stopWord.txt";
+		private static Set<String> stopWordSet = new HashSet<String>();
+		
+		@Override
+		protected void setup(
+				Mapper<Object, Text, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+		
+			FileReader fin = new FileReader(stopWordFilePath);
+			BufferedReader reader = new BufferedReader(fin);
+			while(true)
+			{
+				String stopWord = reader.readLine();
+				if(stopWord == null) break;
+				stopWordSet.add(stopWord);
+			}
+			reader.close();
+		}
+
 		@Override
 		protected void map(Object key, Text value,
 				Mapper<Object, Text, Text, IntWritable>.Context context)
@@ -31,9 +54,12 @@ public class InvertedIndex {
 			while(tokens.hasMoreTokens())
 			{
 				String token = tokens.nextToken();
-				Text outKey = new Text();
-				outKey.set(token + ":" + split.getPath());
-				context.write(outKey, new IntWritable(1));
+				if(!stopWordSet.contains(token))
+				{
+					Text outKey = new Text();
+					outKey.set(token + ":" + split.getPath());
+					context.write(outKey, new IntWritable(1));
+				}
 			}		
 		}
 		

@@ -47,4 +47,3 @@ public class FloatType implements WritableComparable<FloatType> {
 		return (value + "");
 	}
 }
-
