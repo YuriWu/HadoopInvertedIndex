@@ -1,7 +1,10 @@
 # HadoopInvertedIndex
 
 Newest Updates:</br>
-	1. Remove the redundant suffixes in file paths.
+	1. Load 'stopWord.txt' file by using cache technique.</br>
+
+Previous Updates:</br>
+	1. Remove the redundant suffixes in file paths.</br>
 	2. Delete redundant '\t' in the output. 
 
 Previous Updates:</br>

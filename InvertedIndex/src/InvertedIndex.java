@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -9,6 +10,7 @@ import java.util.Set;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
@@ -23,8 +25,8 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 public class InvertedIndex {
 	
 	public static class InvertedIndexMapper extends Mapper<Object, Text, Text, IntWritable> {
-
-		private static String stopWordFilePath = "input/stopWord.txt";
+		
+		private static Path[] localFiles;
 		private static Set<String> stopWordSet = new HashSet<String>();
 		
 		@Override
@@ -32,7 +34,9 @@ public class InvertedIndex {
 				Mapper<Object, Text, Text, IntWritable>.Context context)
 				throws IOException, InterruptedException {
 		
-			FileReader fin = new FileReader(stopWordFilePath);
+			Configuration conf = context.getConfiguration();
+			localFiles = DistributedCache.getLocalCacheFiles(conf);
+			FileReader fin = new FileReader(localFiles[0].toString());
 			BufferedReader reader = new BufferedReader(fin);
 			while(true)
 			{
@@ -177,9 +181,12 @@ public class InvertedIndex {
 		}
 	}
 	
-	public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException
+	public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, URISyntaxException
 	{
 		Configuration conf = new Configuration();
+		
+		DistributedCache.addCacheFile((new Path(args[2])).toUri(), conf);
+		
 		Job job = new Job(conf, "Inverted Index");
 		
 		job.setJarByClass(InvertedIndex.class);
